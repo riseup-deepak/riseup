@@ -1,0 +1,10 @@
+{
+  "community": "riseupatwork.circle.so",
+  "apiVersion": "v2",
+  "defaultSpace": null,
+  "spaces": {},
+  "defaults": {
+    "commentsEnabled": true,
+    "likingEnabled": true
+  }
+}

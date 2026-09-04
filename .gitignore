@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+.env.local
+*.log
+.DS_Store
+
+# Local scratch drafts pulled from Drive; publish-ready posts live in content/
+content/_scratch/

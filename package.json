@@ -1,0 +1,29 @@
+{
+  "name": "riseup-circle",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Publish RISEUP@work posts and notes to riseupatwork.circle.so",
+  "type": "module",
+  "bin": {
+    "circle": "./dist/cli.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.ts",
+    "circle": "tsx src/cli.ts",
+    "typecheck": "tsc --noEmit",
+    "prepare": "npm run build"
+  },
+  "dependencies": {
+    "gray-matter": "^4.0.3",
+    "marked": "^12.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
