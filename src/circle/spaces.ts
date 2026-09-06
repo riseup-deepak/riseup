@@ -1,4 +1,4 @@
-import type { CircleClient } from './client.js';
+import { CircleApiError, type CircleClient } from './client.js';
 
 export interface CircleSpace {
   id: number;
@@ -40,9 +40,28 @@ function toSpace(raw: unknown): CircleSpace | null {
 }
 
 export async function listSpaces(client: CircleClient): Promise<CircleSpace[]> {
-  const payload = await client.request<unknown>('/spaces', {
-    query: { per_page: 100 },
-  });
+  let payload: unknown;
+  try {
+    payload = await client.request<unknown>('/spaces', { query: { per_page: 100 } });
+  } catch (err) {
+    // Checked against the Admin API V2 OpenAPI spec on 2026-09-05: under
+    // /api/admin/v2/spaces only POST (Create Space) is defined. There is
+    // Show / Update / Delete for a single space, but no list endpoint at all.
+    // So a 404 here is a documented gap, not a wrong path — say so, rather
+    // than letting it read as a broken URL.
+    if (err instanceof CircleApiError && err.status === 404) {
+      throw new Error(
+        'Circle has no "list spaces" endpoint in the Admin API V2 — the V2 spec defines\n' +
+          'only create / show / update / delete for spaces. Two ways round it:\n' +
+          '  a) Use a V1 token and set "apiVersion": "v1" in circle.config.json. V1 does\n' +
+          '     have GET /api/v1/spaces, and posting still works.\n' +
+          '  b) Stay on V2 and fill in "spaces" by hand in circle.config.json. A space id\n' +
+          '     is the number in the space\'s admin URL in Circle.\n' +
+          'Pushing a post does not need this listing — only `doctor` and `spaces` do.',
+      );
+    }
+    throw err;
+  }
   return unwrapList(payload)
     .map(toSpace)
     .filter((s): s is CircleSpace => s !== null)

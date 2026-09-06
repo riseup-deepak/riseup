@@ -1,4 +1,5 @@
 import type { ApiVersion } from '../config.js';
+import type { TipTapDoc } from '../content/tiptap.js';
 import type { CircleClient } from './client.js';
 
 export type PostStatus = 'published' | 'draft';
@@ -6,8 +7,10 @@ export type PostStatus = 'published' | 'draft';
 export interface CreatePostInput {
   spaceId: number;
   title: string;
-  /** Post body as HTML. Circle stores rich text, not markdown. */
+  /** Post body as HTML. Used by the v1 API, and for previews. */
   html: string;
+  /** Post body as a TipTap document. This is what the v2 API stores. */
+  tiptap: TipTapDoc;
   status: PostStatus;
   commentsEnabled: boolean;
   likingEnabled: boolean;
@@ -26,15 +29,18 @@ export interface CreatedPost {
  * ---------------------------------------------------------------------------
  * PAYLOAD SHAPES — the one place to edit if Circle rejects a create.
  * ---------------------------------------------------------------------------
- * These were written without access to Circle's live OpenAPI spec (all
- * circle.so hosts are blocked from the environment this was authored in), so
- * treat them as a starting point verified by your first real run, not gospel.
+ * Verified 2026-09-05 against the Admin API V2 OpenAPI spec
+ * (https://api-headless.circle.so/api/admin/v2/swagger.yaml, POST
+ * /api/admin/v2/posts). Required properties are `space_id` and `name`; the
+ * rest below are all in the documented schema.
  *
- * To check them before posting anything for real:
+ * The one correction from the original blind reconstruction: `tiptap_body.body`
+ * is a TipTap *document object* (`{type, content}`, both required), not an HTML
+ * string. HTML there is what a 422 would have named.
+ *
+ * To re-check before posting anything for real:
  *     npm run circle -- push --file content/example-post.md --dry-run
- * That prints the exact JSON below. Compare it against
- *     https://api.circle.so/apis/admin-api    (Posts -> Create)
- * and adjust here. Nothing else in the codebase needs to change.
+ * That prints the exact JSON below and sends nothing.
  */
 export function buildCreatePostPayload(
   version: ApiVersion,
@@ -52,12 +58,11 @@ export function buildCreatePostPayload(
     };
   }
 
-  // v2 stores rich text as a TipTap document. Circle accepts an HTML string
-  // under `tiptap_body.body` and converts it server-side.
+  // v2 stores rich text as a TipTap document under `tiptap_body.body`.
   return {
     space_id: input.spaceId,
     name: input.title,
-    tiptap_body: { body: input.html },
+    tiptap_body: { body: input.tiptap },
     status: input.status,
     is_comments_enabled: input.commentsEnabled,
     is_liking_enabled: input.likingEnabled,

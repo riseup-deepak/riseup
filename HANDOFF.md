@@ -24,6 +24,12 @@ file and runs the push.
 has `circle.so` blocked by network policy, so nothing could be verified against
 the live API and the token step was impossible there.
 
+**2026-09-05:** the Cowork cloud container is blocked the same way — the egress
+proxy refuses CONNECT to both `app.circle.so` and `api.circle.so`. So the CLI
+cannot reach Circle from there either, and tasks 1, 2 and 4 have to run on a
+machine that can (Deepak's laptop). Task 3 needed no network and is done; the
+API spec was read through a browser.
+
 ## Task 1 — Get an API token
 
 In Circle: **Settings → Developers → Tokens** (Deepak has
@@ -59,7 +65,47 @@ This writes an alias for every space into `circle.config.json`. Ask Deepak which
 space he posts to most and set it as `"defaultSpace"`, so `--space` can be
 omitted from routine pushes.
 
-## Task 3 — Verify the create-post payload  ← the one real unknown
+## Task 3 — Verify the create-post payload  ← DONE (2026-09-05)
+
+Verified against the Admin API V2 OpenAPI spec, read from
+`https://api-headless.circle.so/api/admin/v2/swagger.yaml` (the spec behind
+Circle's Swagger UI; the docs page itself renders client-side and reads empty).
+
+**One field was wrong.** `tiptap_body.body` is a TipTap *document object*, not
+an HTML string:
+
+```yaml
+tiptap_body:
+  properties:
+    body:
+      type: object
+      properties: { type: string, content: array }
+      required: [type, content]
+```
+
+Fixed: `src/content/tiptap.ts` converts the post markdown into a TipTap document
+and `buildCreatePostPayload()` sends it. `scripts/verify-tiptap.ts` checks the
+result structurally (`npx tsx scripts/verify-tiptap.ts`).
+
+Everything else in the payload checked out: path `/api/admin/v2/posts`, host
+`app.circle.so`, required fields `space_id` and `name`, and `status`,
+`is_comments_enabled`, `is_liking_enabled`, `published_at` all real properties.
+`status` also accepts `scheduled`. Auth stays `Bearer` — Circle's quick start
+says `Bearer` for both V1 and V2 tokens (the spec's securityScheme says
+`Token`, which looks stale; if a 401 appears, that is the first thing to flip).
+
+**Still untested against the live API.** Nothing here has been sent to Circle.
+
+### New problem found: no "list spaces" endpoint in V2
+
+The V2 spec has `POST /spaces`, and show / update / delete on `/spaces/{id}`,
+but **no list endpoint**. `doctor` and `spaces --save` both call
+`GET /spaces`, so both will 404 on v2. `listSpaces()` now explains this instead
+of failing blankly. Options: use a V1 token with `"apiVersion": "v1"`, or stay
+on V2 and write space ids into `circle.config.json` by hand. Pushing a post
+does not need the listing.
+
+## Task 3 (original notes)
 
 **The request body for creating a post was written without access to Circle's
 API spec.** Field names are a best reconstruction, not verified.

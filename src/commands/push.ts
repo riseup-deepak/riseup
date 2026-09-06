@@ -123,6 +123,7 @@ export async function push(opts: PushOptions): Promise<number> {
       spaceId,
       title: source.title,
       html: source.html,
+      tiptap: source.tiptap,
       status,
       commentsEnabled,
       likingEnabled,

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import matter from 'gray-matter';
 import type { PostStatus } from '../circle/posts.js';
 import { renderMarkdown, htmlToText, wordCount } from './markdown.js';
+import { markdownToTipTap, type TipTapDoc } from './tiptap.js';
 
 export interface PostDocument {
   title: string;
@@ -13,6 +14,8 @@ export interface PostDocument {
   /** Provenance: the Google Doc / Substack URL this was pulled from. */
   source?: string;
   html: string;
+  /** The same body as a TipTap document — what the v2 API actually stores. */
+  tiptap: TipTapDoc;
   text: string;
   words: number;
   /** Non-fatal problems worth showing before publishing. */
@@ -65,6 +68,7 @@ export function parseDocument(markdown: string, label: string): PostDocument {
   }
 
   const html = renderMarkdown(body);
+  const tiptap = markdownToTipTap(body);
   const text = htmlToText(html);
 
   if (title.length > 120) {
@@ -83,6 +87,7 @@ export function parseDocument(markdown: string, label: string): PostDocument {
     publishAt: front.publish_at === undefined ? undefined : String(front.publish_at),
     source: front.source === undefined ? undefined : String(front.source),
     html,
+    tiptap,
     text,
     words: wordCount(text),
     warnings,
