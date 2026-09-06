@@ -13,12 +13,14 @@ ${bold('Usage')}
   circle doctor                         Check token, config and connectivity
   circle spaces [--save] [--json]       List spaces; --save records aliases
   circle push --file <post.md> [opts]   Push a markdown post to Circle
+  circle push --dir <folder> [opts]     Push every .md in a folder, in date order
   circle push --stdin [opts]            Read the post from stdin
 
 ${bold('Push options')}
   --space <alias|id>   Target space. Defaults to frontmatter, then defaultSpace.
   --publish            Publish live (skips the draft/publish question).
   --draft              Save as a draft.
+  --schedule           Schedule for the frontmatter publish_at time.
   --yes                Skip the confirmation prompt. Requires --publish or --draft.
   --dry-run            Print the exact request that would be sent, send nothing.
   --verbose            Log each HTTP request.
@@ -28,8 +30,9 @@ ${bold('Post format')}
 
     ---
     title: Your post title
-    space: announcements
+    space: from-dr-deepak-s-desk
     comments: true
+    publish_at: 2026-09-08T09:00:00-05:00
     source: https://docs.google.com/document/d/...
     ---
 
@@ -46,10 +49,12 @@ async function main(): Promise<number> {
     allowPositionals: true,
     options: {
       file: { type: 'string', short: 'f' },
+      dir: { type: 'string', short: 'd' },
       space: { type: 'string', short: 's' },
       stdin: { type: 'boolean', default: false },
       publish: { type: 'boolean', default: false },
       draft: { type: 'boolean', default: false },
+      schedule: { type: 'boolean', default: false },
       yes: { type: 'boolean', short: 'y', default: false },
       'dry-run': { type: 'boolean', default: false },
       verbose: { type: 'boolean', default: false },
@@ -74,27 +79,36 @@ async function main(): Promise<number> {
       return spaces({ save: values.save, json: values.json });
 
     case 'push': {
-      if (values.publish && values.draft) {
-        failure('--publish and --draft are mutually exclusive.');
+      const chosen = [values.publish, values.draft, values.schedule].filter(Boolean).length;
+      if (chosen > 1) {
+        failure('--publish, --draft and --schedule are mutually exclusive.');
         return 1;
       }
-      if (!values.file && !values.stdin) {
-        failure('Nothing to push. Pass --file <post.md> or --stdin.');
+      const sources = [values.file, values.dir, values.stdin].filter(Boolean).length;
+      if (sources === 0) {
+        failure('Nothing to push. Pass --file <post.md>, --dir <folder>, or --stdin.');
         return 1;
       }
-      if (values.file && values.stdin) {
-        failure('--file and --stdin are mutually exclusive.');
+      if (sources > 1) {
+        failure('--file, --dir and --stdin are mutually exclusive.');
         return 1;
       }
-      if (values.yes && !values.publish && !values.draft) {
-        failure('--yes needs an explicit --publish or --draft, so the status is never guessed.');
+      if (values.yes && chosen === 0) {
+        failure('--yes needs an explicit --publish, --draft or --schedule, so the status is never guessed.');
         return 1;
       }
       const opts: PushOptions = {
         file: values.file,
+        dir: values.dir,
         stdin: values.stdin,
         space: values.space,
-        status: values.publish ? 'published' : values.draft ? 'draft' : undefined,
+        status: values.publish
+          ? 'published'
+          : values.draft
+            ? 'draft'
+            : values.schedule
+              ? 'scheduled'
+              : undefined,
         yes: values.yes,
         dryRun: values['dry-run'],
         verbose: values.verbose,

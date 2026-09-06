@@ -2,7 +2,7 @@ import type { ApiVersion } from '../config.js';
 import type { TipTapDoc } from '../content/tiptap.js';
 import type { CircleClient } from './client.js';
 
-export type PostStatus = 'published' | 'draft';
+export type PostStatus = 'published' | 'draft' | 'scheduled';
 
 export interface CreatePostInput {
   spaceId: number;
@@ -14,7 +14,10 @@ export interface CreatePostInput {
   status: PostStatus;
   commentsEnabled: boolean;
   likingEnabled: boolean;
-  /** ISO-8601. Only meaningful for scheduled/published posts. */
+  /**
+   * ISO-8601 with an explicit offset, e.g. 2026-09-08T09:00:00-05:00.
+   * Required when status is 'scheduled'. Circle publishes at this instant.
+   */
   publishedAt?: string;
 }
 

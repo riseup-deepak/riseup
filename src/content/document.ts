@@ -31,11 +31,32 @@ function asBool(value: unknown): boolean | undefined {
   return undefined;
 }
 
+/**
+ * YAML parses an unquoted ISO timestamp into a Date, and String(date) gives
+ * "Tue Sep 08 2026 14:00:00 GMT+0000 (Coordinated Universal Time)", which is not
+ * a format Circle accepts. Normalise everything to ISO-8601 UTC here so the
+ * payload is always the same shape whether the frontmatter quoted the value or
+ * not.
+ */
+function asPublishAt(value: unknown, warnings: string[]): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  const date = value instanceof Date ? value : new Date(String(value));
+  if (Number.isNaN(date.getTime())) {
+    warnings.push(
+      `Ignoring unreadable publish_at "${String(value)}". ` +
+        'Use ISO-8601 with an offset, e.g. 2026-09-08T09:00:00-05:00.',
+    );
+    return undefined;
+  }
+  return date.toISOString();
+}
+
 function asStatus(value: unknown, warnings: string[]): PostStatus | undefined {
   if (value === undefined || value === null) return undefined;
   const str = String(value).toLowerCase();
   if (str === 'published' || str === 'publish' || str === 'live') return 'published';
   if (str === 'draft') return 'draft';
+  if (str === 'scheduled' || str === 'schedule') return 'scheduled';
   warnings.push(`Ignoring unrecognised status "${value}" in frontmatter.`);
   return undefined;
 }
@@ -84,7 +105,7 @@ export function parseDocument(markdown: string, label: string): PostDocument {
     status: asStatus(front.status, warnings),
     commentsEnabled: asBool(front.comments),
     likingEnabled: asBool(front.liking),
-    publishAt: front.publish_at === undefined ? undefined : String(front.publish_at),
+    publishAt: asPublishAt(front.publish_at, warnings),
     source: front.source === undefined ? undefined : String(front.source),
     html,
     tiptap,
