@@ -149,6 +149,65 @@ Currently sent for v2:
 Then do one real end-to-end test: push `content/example-post.md` as a **draft**
 to a low-traffic space, confirm it appears correctly in Circle, and delete it.
 
+## Running the live steps (tasks 1, 2, 4)
+
+These have to run on a machine that can reach `app.circle.so`. Neither Claude
+Code on the web nor the Cowork cloud container can. On your laptop:
+
+```bash
+git clone https://github.com/riseup-deepak/riseup.git
+cd riseup
+git checkout claude/riseup-circle-post-publishing-njzn3y
+git am /path/to/circle-payload-fix.patch   # the two commits from 2026-09-05
+npm install
+cp .env.example .env
+```
+
+1. **Token.** In Circle: Settings -> Developers -> Tokens (`/settings/api`) ->
+   New token, name `riseup-publishing`, type **Admin v2**. Circle shows it once.
+   Paste it into `.env` as `CIRCLE_API_TOKEN=`. It never needs to go anywhere
+   else — not into a chat, a commit, or a screenshot.
+
+   There are already three Admin v2 tokens in that community
+   (`headless-admin-staging`, `RISEUP automation`, `Zapier`). A separate one for
+   this tool is still worth having, so it can be revoked on its own.
+
+2. **Check it.**
+
+   ```bash
+   npm run circle -- doctor
+   ```
+
+   Expect: token recognised, and a space count derived from your recent posts.
+
+3. **Record the spaces.**
+
+   ```bash
+   npm run circle -- spaces --save
+   ```
+
+   Then set `"defaultSpace": "from-dr-deepak-s-desk"` (or whatever alias that
+   space gets) in `circle.config.json`.
+
+4. **Draft test.** Do this before anything real:
+
+   ```bash
+   npm run circle -- push --file content/example-post.md --draft
+   ```
+
+   Answer the confirmation prompt. Then open Circle, check the draft renders —
+   headings, the bullet list, the bold runs, the block quote — and delete it.
+   That render is the real test of the TipTap conversion. If a node type comes
+   out wrong, the case for it in `src/content/tiptap.ts` is the only thing to
+   change.
+
+   A 422 names the field it rejected. `buildCreatePostPayload()` is still the
+   only place the payload is built.
+
+Note: the community is at 3,025 of 5,000 Admin API requests for this billing
+cycle. `doctor` and `spaces` page through posts, so they cost a handful of
+requests each. Worth watching if you run them often.
+
 ## Guardrails
 
 - **Never publish live without Deepak confirming.** `push` asks
