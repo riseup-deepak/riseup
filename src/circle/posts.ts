@@ -103,3 +103,132 @@ export async function createPost(
   });
   return readCreated(payload);
 }
+
+export interface CirclePost {
+  id: number;
+  name: string;
+  status: string;
+  spaceId?: number;
+  spaceName?: string;
+  publishedAt?: string;
+  url?: string;
+  likes?: number;
+  comments?: number;
+}
+
+export interface ListPostsResult {
+  posts: CirclePost[];
+  /** Rows the API handed back, before de-duplicating by id. */
+  rowsReturned: number;
+  /** `count` as reported by Circle, when it sends one. */
+  apiCount?: number;
+  pagesFetched: number;
+  /** Ids Circle returned on more than one page. See the note in listPosts. */
+  repeatedIds: number[];
+}
+
+function toPost(raw: unknown): CirclePost | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  const id = Number(o.id);
+  if (!Number.isFinite(id)) return null;
+  const num = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : undefined);
+  return {
+    id,
+    name: String(o.name ?? o.slug ?? `post-${id}`),
+    status: String(o.status ?? 'unknown'),
+    spaceId: num(o.space_id),
+    spaceName: o.space_name === undefined ? undefined : String(o.space_name),
+    publishedAt: o.published_at === undefined || o.published_at === null
+      ? undefined
+      : String(o.published_at),
+    url: typeof o.url === 'string' ? o.url : undefined,
+    likes: num(o.likes_count),
+    comments: num(o.comments_count),
+  };
+}
+
+/**
+ * List posts, de-duplicated by id.
+ *
+ * Why this exists: Circle's admin web table pages by offset over a sort on
+ * published_at, and a space that posts on a fixed timetable has many rows
+ * sharing the exact same published_at. With ties, an offset page boundary can
+ * hand back the same record at the end of one page and the start of the next,
+ * which makes one post look like two. Reading that table is therefore not a
+ * safe way to count anything.
+ *
+ * Ids settle it. Two records mean two different ids. One record served twice
+ * means the same id twice, and that id lands in `repeatedIds`.
+ */
+export async function listPosts(
+  client: CircleClient,
+  opts: { spaceId?: number; status?: string; perPage?: number; maxPages?: number } = {},
+): Promise<ListPostsResult> {
+  const perPage = opts.perPage ?? 100;
+  const maxPages = opts.maxPages ?? 50;
+  const byId = new Map<number, CirclePost>();
+  const seen = new Set<number>();
+  const repeated = new Set<number>();
+  let rowsReturned = 0;
+  let apiCount: number | undefined;
+  let pagesFetched = 0;
+
+  for (let page = 1; page <= maxPages; page += 1) {
+    const payload = await client.request<unknown>('/posts', {
+      query: {
+        page,
+        per_page: perPage,
+        status: opts.status ?? 'all',
+        space_id: opts.spaceId,
+      },
+    });
+    pagesFetched += 1;
+
+    const obj = payload && typeof payload === 'object'
+      ? (payload as Record<string, unknown>)
+      : {};
+    if (apiCount === undefined && Number.isFinite(Number(obj.count))) {
+      apiCount = Number(obj.count);
+    }
+
+    const records = Array.isArray(payload)
+      ? payload
+      : Array.isArray(obj.records)
+        ? (obj.records as unknown[])
+        : Array.isArray(obj.data)
+          ? (obj.data as unknown[])
+          : [];
+
+    rowsReturned += records.length;
+    for (const raw of records) {
+      const post = toPost(raw);
+      if (!post) continue;
+      if (seen.has(post.id)) repeated.add(post.id);
+      seen.add(post.id);
+      byId.set(post.id, post);
+    }
+
+    if (obj.has_next_page !== true || records.length === 0) break;
+  }
+
+  const posts = [...byId.values()].sort((a, b) => {
+    const at = a.publishedAt ?? '';
+    const bt = b.publishedAt ?? '';
+    return at === bt ? a.id - b.id : at.localeCompare(bt);
+  });
+
+  return { posts, rowsReturned, apiCount, pagesFetched, repeatedIds: [...repeated] };
+}
+
+/** Posts that share a space, a publish time and a title, but are separate records. */
+export function findDuplicates(posts: CirclePost[]): CirclePost[][] {
+  const groups = new Map<string, CirclePost[]>();
+  for (const p of posts) {
+    const key = `${p.spaceId ?? '?'}|${p.publishedAt ?? '?'}|${p.name}`;
+    const list = groups.get(key);
+    if (list) list.push(p);
+    else groups.set(key, [p]);
+  }
+  return [...groups.values()].filter((g) => g.length > 1);
+}

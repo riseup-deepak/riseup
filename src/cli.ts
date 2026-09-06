@@ -3,6 +3,7 @@ import { parseArgs } from 'node:util';
 import { loadEnvFile } from './config.js';
 import { doctor } from './commands/doctor.js';
 import { spaces } from './commands/spaces.js';
+import { posts as postsCommand } from './commands/posts.js';
 import { push, type PushOptions } from './commands/push.js';
 import { bold, dim, failure, info } from './ui.js';
 
@@ -12,9 +13,15 @@ ${bold('circle')} — publish RISEUP@work posts and notes to Circle
 ${bold('Usage')}
   circle doctor                         Check token, config and connectivity
   circle spaces [--save] [--json]       List spaces; --save records aliases
+  circle posts [--space <a>] [--status]  List posts by id and flag duplicates
   circle push --file <post.md> [opts]   Push a markdown post to Circle
   circle push --dir <folder> [opts]     Push every .md in a folder, in date order
   circle push --stdin [opts]            Read the post from stdin
+
+${bold('Posts options')}
+  --space <alias|id>   Only this space. Omit for every space.
+  --status <s>         all (default), draft, published or scheduled.
+  --json               Print the raw result.
 
 ${bold('Push options')}
   --space <alias|id>   Target space. Defaults to frontmatter, then defaultSpace.
@@ -59,6 +66,7 @@ async function main(): Promise<number> {
       'dry-run': { type: 'boolean', default: false },
       verbose: { type: 'boolean', default: false },
       save: { type: 'boolean', default: false },
+      status: { type: 'string' },
       json: { type: 'boolean', default: false },
       help: { type: 'boolean', short: 'h', default: false },
     },
@@ -77,6 +85,14 @@ async function main(): Promise<number> {
 
     case 'spaces':
       return spaces({ save: values.save, json: values.json });
+
+    case 'posts':
+      return postsCommand({
+        space: values.space,
+        status: values.status,
+        json: values.json,
+        verbose: values.verbose,
+      });
 
     case 'push': {
       const chosen = [values.publish, values.draft, values.schedule].filter(Boolean).length;

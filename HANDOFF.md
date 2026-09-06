@@ -214,6 +214,27 @@ Note: the community is at 3,025 of 5,000 Admin API requests for this billing
 cycle. `doctor` and `spaces` page through posts, so they cost a handful of
 requests each. Worth watching if you run them often.
 
+## Counting posts: do not read the admin web table
+
+Circle's admin Posts table pages by offset over a sort on `published_at`. A
+space that posts on a fixed timetable has many rows sharing the exact same
+`published_at`, and with those ties an offset page boundary can hand back the
+same record at the end of one page and again at the start of the next. One post
+then looks like two, in both sort directions, on fresh page loads. This produced
+a wrong duplicate count during the 6 September audit.
+
+Use ids instead:
+
+```bash
+npm run circle -- posts --space from-dr-deepak-s-desk --status scheduled
+```
+
+Two records mean two different ids. One record served twice means the same id
+twice, which the command reports separately as a paging repeat and counts once.
+It ends with either "No duplicates" or the exact ids to delete.
+
+`scripts/verify-posts.ts` tests both cases against a stub client.
+
 ## Guardrails
 
 - **Never publish live without Deepak confirming.** `push` asks
