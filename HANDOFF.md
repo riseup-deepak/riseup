@@ -235,6 +235,39 @@ It ends with either "No duplicates" or the exact ids to delete.
 
 `scripts/verify-posts.ts` tests both cases against a stub client.
 
+## Posting pattern, agreed 6 September 2026
+
+No single person posts twice a day. That was judged a deluge.
+
+  Deepak    Tuesday and Thursday, 09:00 US Central, From Dr Deepak's Desk
+  Elizabeth Sunday, Monday, Wednesday, Friday, 02:00 US Central
+  Comics    Monday, 09:00 US Central, weekly
+
+Elizabeth's 96 remaining posts were moved from twice daily onto four days a
+week, running Monday 7 September 2026 to Sunday 21 February 2027. The plan
+lives in `content/elizabeth-4day-schedule.csv` as a record of what was applied.
+
+## Moving scheduled posts
+
+```bash
+npm run circle -- reschedule --file <plan.csv> --dry-run
+npm run circle -- reschedule --file <plan.csv> --limit 1   # test on one
+npm run circle -- reschedule --file <plan.csv>
+```
+
+The plan file is `id,published_at[,label[,note]]`, header optional. Every id is
+looked up in Circle before anything is written, so a wrong id or a post that is
+not scheduled stops the run before the first change. Duplicate ids and
+unreadable times are rejected while reading the file.
+
+The V2 update endpoint accepts `published_at` but not `status` and not
+`space_id`, so rescheduling cannot publish a post or move it between spaces.
+
+A plan goes stale on its own: posts keep publishing on the old schedule while
+the plan sits unrun. When a row has already gone out, the run stops and names
+it. `--skip-published` leaves those rows where they are and moves the rest,
+which is usually what you want on a plan written a day earlier.
+
 ## Guardrails
 
 - **Never publish live without Deepak confirming.** `push` asks

@@ -4,6 +4,7 @@ import { loadEnvFile } from './config.js';
 import { doctor } from './commands/doctor.js';
 import { spaces } from './commands/spaces.js';
 import { posts as postsCommand } from './commands/posts.js';
+import { reschedule } from './commands/reschedule.js';
 import { push, type PushOptions } from './commands/push.js';
 import { bold, dim, failure, info } from './ui.js';
 
@@ -14,6 +15,7 @@ ${bold('Usage')}
   circle doctor                         Check token, config and connectivity
   circle spaces [--save] [--json]       List spaces; --save records aliases
   circle posts [--space <a>] [--status]  List posts by id and flag duplicates
+  circle reschedule --file <plan.csv>   Move scheduled posts to new times
   circle push --file <post.md> [opts]   Push a markdown post to Circle
   circle push --dir <folder> [opts]     Push every .md in a folder, in date order
   circle push --stdin [opts]            Read the post from stdin
@@ -22,6 +24,13 @@ ${bold('Posts options')}
   --space <alias|id>   Only this space. Omit for every space.
   --status <s>         all (default), draft, published or scheduled.
   --json               Print the raw result.
+
+${bold('Reschedule options')}
+  --file <plan.csv>    Rows of id,published_at[,label[,note]]. Header optional.
+  --limit <n>          Only the first n rows. Use it to test on one post.
+  --skip-published     Leave rows that already published alone, move the rest.
+  --dry-run            Print what would change, send nothing.
+  --yes                Skip the confirmation prompt.
 
 ${bold('Push options')}
   --space <alias|id>   Target space. Defaults to frontmatter, then defaultSpace.
@@ -64,9 +73,11 @@ async function main(): Promise<number> {
       schedule: { type: 'boolean', default: false },
       yes: { type: 'boolean', short: 'y', default: false },
       'dry-run': { type: 'boolean', default: false },
+      'skip-published': { type: 'boolean', default: false },
       verbose: { type: 'boolean', default: false },
       save: { type: 'boolean', default: false },
       status: { type: 'string' },
+      limit: { type: 'string' },
       json: { type: 'boolean', default: false },
       help: { type: 'boolean', short: 'h', default: false },
     },
@@ -93,6 +104,25 @@ async function main(): Promise<number> {
         json: values.json,
         verbose: values.verbose,
       });
+
+    case 'reschedule': {
+      let limit: number | undefined;
+      if (values.limit !== undefined) {
+        limit = Number(values.limit);
+        if (!Number.isInteger(limit) || limit < 1) {
+          failure('--limit needs a whole number of 1 or more.');
+          return 1;
+        }
+      }
+      return reschedule({
+        file: values.file,
+        limit,
+        skipPublished: values['skip-published'],
+        yes: values.yes,
+        dryRun: values['dry-run'],
+        verbose: values.verbose,
+      });
+    }
 
     case 'push': {
       const chosen = [values.publish, values.draft, values.schedule].filter(Boolean).length;

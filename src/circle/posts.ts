@@ -232,3 +232,23 @@ export function findDuplicates(posts: CirclePost[]): CirclePost[][] {
   }
   return [...groups.values()].filter((g) => g.length > 1);
 }
+
+/**
+ * Change when a scheduled post publishes.
+ *
+ * The V2 Update Basic Post endpoint accepts `published_at` but not `status` and
+ * not `space_id`, so this moves the time and cannot move a post between spaces
+ * or change whether it is a draft. That is deliberate: rescheduling should not
+ * be able to publish something by accident.
+ */
+export async function updatePublishedAt(
+  client: CircleClient,
+  id: number,
+  publishedAt: string,
+): Promise<CreatedPost> {
+  const payload = await client.request<unknown>(`/posts/${id}`, {
+    method: 'PUT',
+    body: { published_at: publishedAt },
+  });
+  return readCreated(payload);
+}
