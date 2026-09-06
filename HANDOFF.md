@@ -57,6 +57,10 @@ npm run circle -- doctor
 
 ## Task 2 — Record the spaces
 
+**Note:** on V2 this now works through the posts-derived fallback described
+above. Deepak's chosen default and test space is **From Dr. Deepak's desk**
+(slug `from-dr-deepak-s-desk`).
+
 ```bash
 npm run circle -- spaces --save
 ```
@@ -104,6 +108,13 @@ but **no list endpoint**. `doctor` and `spaces --save` both call
 of failing blankly. Options: use a V1 token with `"apiVersion": "v1"`, or stay
 on V2 and write space ids into `circle.config.json` by hand. Pushing a post
 does not need the listing.
+
+**Resolved (Deepak chose to stay on V2).** `GET /posts` is documented in V2 and
+returns `space_id` and `space_name` on every record, so `doctor` and `spaces`
+now fall back to deriving spaces from recent posts
+(`discoverSpacesFromPosts()` in `src/circle/spaces.ts`). Both commands say when
+the list came from that fallback. A space you have never posted to will not
+appear and still needs its id by hand.
 
 ## Task 3 (original notes)
 

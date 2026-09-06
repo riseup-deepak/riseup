@@ -68,6 +68,51 @@ export async function listSpaces(client: CircleClient): Promise<CircleSpace[]> {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/**
+ * Derive spaces from recent posts.
+ *
+ * The Admin API V2 has no "list spaces" endpoint, but `GET /posts` does return
+ * `space_id` and `space_name` on every record, and both that endpoint and those
+ * fields are documented. Paging through recent posts therefore recovers the
+ * space ids we need without any undocumented call.
+ *
+ * The obvious limit: a space with no posts in the window cannot show up. That
+ * is fine for the aliases this CLI needs — you only push to spaces you post to —
+ * but the caller should say so rather than presenting this as a full list.
+ */
+export async function discoverSpacesFromPosts(
+  client: CircleClient,
+  maxPages = 5,
+): Promise<CircleSpace[]> {
+  const found = new Map<number, CircleSpace>();
+
+  for (let page = 1; page <= maxPages; page += 1) {
+    const payload = await client.request<unknown>('/posts', {
+      query: { per_page: 100, page, status: 'all' },
+    });
+    const records = unwrapList(payload);
+    for (const raw of records) {
+      if (!raw || typeof raw !== 'object') continue;
+      const obj = raw as Record<string, unknown>;
+      const id = Number(obj.space_id);
+      if (!Number.isFinite(id) || found.has(id)) continue;
+      found.set(id, {
+        id,
+        name: String(obj.space_name ?? `space-${id}`),
+        slug: undefined,
+      });
+    }
+
+    const hasNext =
+      payload && typeof payload === 'object'
+        ? (payload as Record<string, unknown>).has_next_page === true
+        : false;
+    if (!hasNext || records.length === 0) break;
+  }
+
+  return [...found.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
 /** Turn a space name into a stable, typo-resistant config alias. */
 export function aliasFor(space: CircleSpace): string {
   const source = space.slug ?? space.name;

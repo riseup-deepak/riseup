@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { CircleClient, CircleApiError, baseUrlFor } from '../circle/client.js';
-import { listSpaces } from '../circle/spaces.js';
+import { discoverSpacesFromPosts, listSpaces } from '../circle/spaces.js';
 import { CONFIG_PATH, loadConfig, resolveSpaceId } from '../config.js';
 import { bold, cyan, dim, failure, field, heading, info, success, warn } from '../ui.js';
 
@@ -35,25 +35,59 @@ export async function doctor(): Promise<number> {
   heading('Connection');
   const client = new CircleClient({ config, token });
   let spaces;
+  let derived = false;
   try {
     spaces = await listSpaces(client);
   } catch (err) {
-    if (err instanceof CircleApiError) {
-      failure(`${err.status} from ${baseUrlFor(config)}/spaces`);
-      info(dim(err.body.slice(0, 400)));
-      if (err.hint) info(`\n${err.hint}`);
-    } else {
-      failure((err as Error).message);
-      info(
-        dim(
-          '\nIf this is a network/TLS error, confirm this machine can reach app.circle.so.',
-        ),
-      );
+    // The Admin API V2 has no list-spaces endpoint, so listSpaces throws a plain
+    // Error explaining that. Prove the connection with `GET /posts` instead —
+    // documented, and it carries the space ids we want anyway.
+    const noListEndpoint = config.apiVersion === 'v2' && !(err instanceof CircleApiError);
+    if (!noListEndpoint) {
+      if (err instanceof CircleApiError) {
+        failure(`${err.status} from ${baseUrlFor(config)}/spaces`);
+        info(dim(err.body.slice(0, 400)));
+        if (err.hint) info(`\n${err.hint}`);
+      } else {
+        failure((err as Error).message);
+        info(
+          dim(
+            '\nIf this is a network/TLS error, confirm this machine can reach app.circle.so.',
+          ),
+        );
+      }
+      return 1;
     }
-    return 1;
+
+    try {
+      spaces = await discoverSpacesFromPosts(client);
+      derived = true;
+    } catch (inner) {
+      if (inner instanceof CircleApiError) {
+        failure(`${inner.status} from ${baseUrlFor(config)}/posts`);
+        info(dim(inner.body.slice(0, 400)));
+        if (inner.hint) info(`\n${inner.hint}`);
+      } else {
+        failure((inner as Error).message);
+        info(
+          dim(
+            '\nIf this is a network/TLS error, confirm this machine can reach app.circle.so.',
+          ),
+        );
+      }
+      return 1;
+    }
   }
 
-  success(`Authenticated. Found ${spaces.length} space${spaces.length === 1 ? '' : 's'}.`);
+  success(
+    derived
+      ? `Authenticated. Saw ${spaces.length} space${spaces.length === 1 ? '' : 's'} across your recent posts.`
+      : `Authenticated. Found ${spaces.length} space${spaces.length === 1 ? '' : 's'}.`,
+  );
+  if (derived) {
+    warn('Admin API V2 has no list-spaces endpoint, so these came from `GET /posts`.');
+    warn('A space you have never posted to will not appear. Add it by hand if you need it.');
+  }
 
   heading('Default space');
   if (!config.defaultSpace) {

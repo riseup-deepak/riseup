@@ -1,13 +1,27 @@
 import { writeFileSync } from 'node:fs';
 import { CircleClient } from '../circle/client.js';
-import { aliasFor, listSpaces } from '../circle/spaces.js';
+import { aliasFor, discoverSpacesFromPosts, listSpaces } from '../circle/spaces.js';
 import { CONFIG_PATH, loadConfig, requireToken } from '../config.js';
-import { bold, dim, heading, info, success } from '../ui.js';
+import { bold, dim, heading, info, success, warn } from '../ui.js';
 
 export async function spaces(opts: { save: boolean; json: boolean }): Promise<number> {
   const config = loadConfig();
   const client = new CircleClient({ config, token: requireToken() });
-  const found = await listSpaces(client);
+
+  // V2 has no list-spaces endpoint (see listSpaces). Fall back to deriving the
+  // spaces from recent posts, which uses only documented V2 endpoints.
+  let found;
+  let derived = false;
+  try {
+    found = await listSpaces(client);
+  } catch (err) {
+    if (config.apiVersion !== 'v2') throw err;
+    info(dim((err as Error).message));
+    info('');
+    info(dim('Falling back to reading space ids off your recent posts...'));
+    found = await discoverSpacesFromPosts(client);
+    derived = true;
+  }
 
   if (opts.json) {
     info(JSON.stringify(found, null, 2));
@@ -15,11 +29,19 @@ export async function spaces(opts: { save: boolean; json: boolean }): Promise<nu
   }
 
   if (found.length === 0) {
-    info('No spaces returned. Check that the token has admin access to the community.');
+    info(
+      derived
+        ? 'No posts found, so no space ids could be derived. Add the ids by hand in circle.config.json.'
+        : 'No spaces returned. Check that the token has admin access to the community.',
+    );
     return 1;
   }
 
   heading(`Spaces in ${config.community}`);
+  if (derived) {
+    warn('Derived from recent posts — a space you have never posted to will not appear here.');
+    info('');
+  }
   const width = Math.max(...found.map((s) => aliasFor(s).length));
   for (const space of found) {
     const group = space.spaceGroup ? dim(`  (${space.spaceGroup})`) : '';
