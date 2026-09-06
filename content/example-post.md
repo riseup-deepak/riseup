@@ -1,6 +1,5 @@
 ---
 title: What we mean by a career that compounds
-space: announcements
 comments: true
 liking: true
 source: https://docs.google.com/document/d/EXAMPLE

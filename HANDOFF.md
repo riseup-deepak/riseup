@@ -98,13 +98,19 @@ Everything else in the payload checked out: path `/api/admin/v2/posts`, host
 says `Bearer` for both V1 and V2 tokens (the spec's securityScheme says
 `Token`, which looks stale; if a 401 appears, that is the first thing to flip).
 
-**Still untested against the live API.** Nothing here has been sent to Circle.
+**Verified live on 2026-09-06.** A draft was created in From Dr. Deepak's Desk
+from `content/example-post.md` and checked in Circle's editor. Headings, the
+bullet list with bold lead-ins, the block quote and the closing paragraphs all
+render correctly, and the markdown soft wraps collapse to clean sentences
+instead of stray line breaks. Circle accepted the payload with no 422.
 
-### New problem found: no "list spaces" endpoint in V2
+### Circle's V2 spec is incomplete about spaces
 
-The V2 spec has `POST /spaces`, and show / update / delete on `/spaces/{id}`,
-but **no list endpoint**. `doctor` and `spaces --save` both call
-`GET /spaces`, so both will 404 on v2. `listSpaces()` now explains this instead
+The published V2 spec has `POST /spaces`, and show / update / delete on
+`/spaces/{id}`, but no list endpoint, so `GET /spaces` looked like it would
+404. **It does not.** The first live run returned 25 spaces normally: the
+endpoint exists, Circle just left it out of the spec. The fallback below is
+kept as a safety net but is not the path actually taken. `listSpaces()` now explains this instead
 of failing blankly. Options: use a V1 token with `"apiVersion": "v1"`, or stay
 on V2 and write space ids into `circle.config.json` by hand. Pushing a post
 does not need the listing.
