@@ -234,10 +234,15 @@ async function main(): Promise<number> {
   }
 }
 
+// Set exitCode rather than calling process.exit(): exit() tears the process
+// down before a large piped stdout write has flushed, which truncates
+// `status --json` and `export` into invalid JSON.
 main()
-  .then((code) => process.exit(code))
+  .then((code) => {
+    process.exitCode = code;
+  })
   .catch((err: unknown) => {
     failure((err as Error).message);
     if (process.env.FOLLOWUP_DEBUG) console.error(err);
-    process.exit(1);
+    process.exitCode = 1;
   });
