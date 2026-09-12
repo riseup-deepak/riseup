@@ -2,18 +2,21 @@
   "name": "riseup-circle",
   "version": "0.1.0",
   "private": true,
-  "description": "Publish RISEUP@work posts and notes to riseupatwork.circle.so",
+  "description": "Publish RISEUP@work posts to Circle, and track meeting follow-ups from Fathom",
   "type": "module",
   "bin": {
-    "circle": "./dist/cli.js"
+    "circle": "./dist/cli.js",
+    "followup": "./dist/followup-cli.js"
   },
   "engines": {
     "node": ">=20"
   },
   "scripts": {
     "build": "tsc",
+    "build:followup": "tsc -p tsconfig.followup.json",
     "dev": "tsx src/cli.ts",
     "circle": "tsx src/cli.ts",
+    "followup": "tsx src/followup-cli.ts",
     "typecheck": "tsc --noEmit",
     "prepare": "npm run build"
   },

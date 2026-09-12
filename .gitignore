@@ -7,3 +7,6 @@ dist/
 
 # Local scratch drafts pulled from Drive; publish-ready posts live in content/
 content/_scratch/
+
+# Generated dashboard
+data/dashboard.html

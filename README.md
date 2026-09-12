@@ -136,3 +136,49 @@ src/
     doctor.ts  spaces.ts  push.ts
 content/               posts, committed as a publishing history
 ```
+
+## Meeting follow-up ledger
+
+Fathom captures what you agreed to on a call. Nothing carries it forward. The
+`followup` CLI turns those action items into a tracked ledger that survives
+between runs, so a promise made on a Tuesday call is still visible three weeks
+later if you never acted on it.
+
+```bash
+npm run followup -- status
+```
+
+State lives in `data/commitments.json`, under version control. Each commitment
+keeps a stable id derived from the recording and the wording, so re-ingesting
+the same meeting never duplicates a row and never reopens something you closed.
+
+```bash
+# Add action items from Fathom (the connector's text listing or JSON)
+npm run followup -- ingest --file fathom-meetings.txt
+
+# Match sent mail against open items — look before you write
+npm run followup -- reconcile --file sent.json
+npm run followup -- reconcile --file sent.json --apply
+
+# Apply anything ticked off on the published dashboard
+npm run followup -- overrides --file overrides.json
+
+# Regenerate the dashboard
+npm run followup -- dashboard --out data/dashboard.html
+```
+
+### What it will and will not do
+
+It never sends mail. Commitments other people made to you are surfaced under
+"Waiting on others" so you can chase in your own words, never chased for you.
+
+Auto-closing is deliberately conservative. A sent email only closes a
+commitment when it went to the right person *and* shares at least two
+distinctive words with what you promised — being addressed to someone you mail
+daily proves nothing on its own. Only mail-shaped commitments ("email Hank the
+proposal") are eligible; "schedule a call" leaves no trace in Sent mail and
+stays open until you close it yourself. A missed close costs one tick on the
+dashboard; a wrong one loses the commitment silently.
+
+The twice-daily cycle — pull, reconcile, republish — is written up in
+`.claude/skills/followup/SKILL.md`.
